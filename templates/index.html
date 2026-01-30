@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ClipSort - Image Clustering</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            background: linear-gradient(135deg, #a8ffeb 0%, #e0fff7 100%);
+            font-family: 'Inter', sans-serif;
+            color: #222;
+            margin: 0;
+            padding: 0;
+        }
+        .container {
+            max-width: 900px;
+            margin: 40px auto;
+            background: #f6fffa;
+            border-radius: 18px;
+            box-shadow: 0 2px 16px #a8ffeb55;
+            padding: 32px 24px;
+        }
+        h1 {
+            color: #2ec4b6;
+            text-align: center;
+            font-size: 2.2em;
+            font-weight: 700;
+            margin-bottom: 0.5em;
+            letter-spacing: -1px;
+        }
+        form.upload-form, form.cluster-form {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-bottom: 2em;
+        }
+        input[type="file"] {
+            margin-bottom: 1em;
+            border: 1px solid #2ec4b6;
+            border-radius: 8px;
+            padding: 0.5em;
+            background: #fff;
+        }
+        input[type="number"] {
+            width: 60px;
+            padding: 0.3em;
+            border-radius: 8px;
+            border: 1px solid #2ec4b6;
+            margin-left: 0.5em;
+        }
+        button, input[type="submit"] {
+            background: #2ec4b6;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            padding: 0.7em 1.5em;
+            font-size: 1em;
+            font-family: 'Inter', sans-serif;
+            cursor: pointer;
+            margin-top: 0.5em;
+            transition: background 0.2s;
+        }
+        button:hover, input[type="submit"]:hover {
+            background: #11998e;
+        }
+        .images-section {
+            margin-bottom: 2em;
+        }
+        .images-list, .cluster-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px;
+            justify-content: center;
+        }
+        .image-thumb {
+            width: 100px;
+            height: 100px;
+            object-fit: cover;
+            border-radius: 10px;
+            border: 1.5px solid #2ec4b6;
+            background: #fff;
+        }
+        .cluster-box {
+            background: #e0fff7;
+            border-radius: 12px;
+            padding: 1em;
+            margin-bottom: 1em;
+            box-shadow: 0 1px 4px #a8ffeb33;
+        }
+        .flash {
+            background: #2ec4b6;
+            color: #fff;
+            padding: 0.7em 1em;
+            border-radius: 8px;
+            margin-bottom: 1em;
+            text-align: center;
+            font-weight: 500;
+        }
+        .download-btn {
+            display: block;
+            margin: 0 auto 2em auto;
+            background: #11998e;
+            color: #fff;
+            border-radius: 8px;
+            padding: 0.6em 1.2em;
+            text-decoration: none;
+            font-weight: 600;
+            text-align: center;
+            width: fit-content;
+        }
+        .download-btn:hover {
+            background: #2ec4b6;
+        }
+        @media (max-width: 600px) {
+            .container { padding: 12px 4px; }
+            .image-thumb { width: 70px; height: 70px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>ClipSort</h1>
+        <form action="{{ url_for('clear_cache') }}" method="post" style="text-align:center; margin-bottom: 1.5em;">
+            <button type="submit" style="background:#ff6b6b; color:white; border:none; border-radius:8px; padding:0.6em 1.2em; font-weight:600; cursor:pointer;">Clear All Cache</button>
+        </form>
+        {% with messages = get_flashed_messages() %}
+          {% if messages %}
+            <div class="flash">
+              {% for message in messages %}{{ message }}<br>{% endfor %}
+            </div>
+          {% endif %}
+        {% endwith %}
+        <form class="upload-form" action="{{ url_for('upload_file') }}" method="post" enctype="multipart/form-data">
+            <input type="file" name="file" accept="image/*" multiple required>
+            <input type="submit" value="Upload Images">
+        </form>
+        <div class="images-section">
+            <h2 style="text-align:center; color:#11998e;">Uploaded Images</h2>
+            <div class="images-list">
+                {% for img in uploaded_images %}
+                    <img src="{{ url_for('uploaded_file', filename=img) }}" class="image-thumb" alt="uploaded image">
+                {% endfor %}
+                {% if uploaded_images|length == 20 %}
+                    <span style="color:#11998e;">Showing only the first 20 images.</span>
+                {% elif uploaded_images|length == 0 %}
+                    <span style="color:#11998e;">No images uploaded yet!</span>
+                {% endif %}
+            </div>
+        </div>
+        <form class="cluster-form" action="{{ url_for('generate_embeddings') }}" method="post">
+            <label for="n_clusters">Number of clusters:</label>
+            <input type="number" name="n_clusters" id="n_clusters" min="2" max="10" value="4" required>
+            <button type="submit">Cluster Images</button>
+        </form>
+        <a href="{{ url_for('download_clusters') }}" class="download-btn">Download Clustered Images (ZIP)</a>
+        <div class="clusters-section">
+            <h2 style="text-align:center; color:#11998e;">Clustered Folders</h2>
+            {% for folder, images in clustered_images.items() %}
+                <div class="cluster-box">
+                    <h3 style="color:#2ec4b6;">{{ cluster_names[folder] }}</h3>
+                    <div class="cluster-list">
+                        {% for img in images %}
+                            <img src="{{ url_for('clustered_file', cluster=folder, filename=img) }}" class="image-thumb" alt="clustered image">
+                        {% endfor %}
+                        {% if images|length == 20 %}
+                            <span style="color:#11998e;">Showing only the first 20 images.</span>
+                        {% elif images|length == 0 %}
+                            <span style="color:#11998e;">No images in this cluster.</span>
+                        {% endif %}
+                    </div>
+                </div>
+            {% else %}
+                <span style="color:#11998e;">No clusters yet!</span>
+            {% endfor %}
+        </div>
+    </div>
+</body>
+</html> 
